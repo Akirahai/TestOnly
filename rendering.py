@@ -1,7 +1,3 @@
-from rasterization_utils import torch_isect_tiles, torch_isect_offset_encode, torch_rasterize_to_pixels_per_tile_per_pixel_per_gauss, torch_rasterize_to_pixels_gaussian_merge, torch_rasterize_to_pixels_pixels_vectorized
-from EWA_fully_fused_proj_packed import *
-from sh_utils import build_color
-
 import torch
 import torch.distributed
 import torch.nn.functional as F
@@ -10,6 +6,12 @@ import math
 
 from typing import Dict, Optional, Tuple
 from typing_extensions import Literal
+
+
+from rasterization_utils import torch_isect_tiles, torch_isect_offset_encode, torch_rasterize_to_pixels_per_tile_per_pixel_per_gauss, torch_rasterize_to_pixels_gaussian_merge, torch_rasterize_to_pixels_pixels_vectorized
+from EWA_fully_fused_proj_packed import *
+from sh_utils import build_color
+
 
 
 # Assign def to torch_rasterize_to_pixels

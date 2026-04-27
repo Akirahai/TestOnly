@@ -25,7 +25,7 @@ def build_rotation(r):
 
     q = r / norm[:, None]
 
-    R = torch.zeros((q.size(0), 3, 3), device='cuda')
+    R = torch.zeros((q.size(0), 3, 3), device=r.device, dtype=r.dtype)
 
     r = q[:, 0]
     x = q[:, 1]
@@ -46,7 +46,7 @@ def build_rotation(r):
 
 # Build the scaling and rotation matrix L, which is used to compute the covariance.
 def build_scaling_rotation(s, r):
-    L = torch.zeros((s.shape[0], 3, 3), dtype=torch.float, device="cuda")
+    L = torch.zeros((s.shape[0], 3, 3), dtype=s.dtype, device=s.device)
     R = build_rotation(r)
 
     L[:,0,0] = s[:,0]
@@ -58,7 +58,7 @@ def build_scaling_rotation(s, r):
 
 # Build the memory efficient lowerdiag from L (from (N,3,3) to (N,6)).
 def strip_lowerdiag(L):
-    uncertainty = torch.zeros((L.shape[0], 6), dtype=torch.float, device="cuda")
+    uncertainty = torch.zeros((L.shape[0], 6), dtype=L.dtype, device=L.device)
     uncertainty[:, 0] = L[:, 0, 0]
     uncertainty[:, 1] = L[:, 0, 1]
     uncertainty[:, 2] = L[:, 0, 2]

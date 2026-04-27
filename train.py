@@ -31,7 +31,12 @@ if IS_NPU_BACKEND: import torch_npu
 from sample import depth_to_world, voxel_downsample, tsdf_fusion
 
 
-DEVICE = torch.device('npu') if VERSION != 'gsplat' and VERSION != 'torchsplat' else torch.device('cuda')
+if VERSION not in {'gsplat', 'torchsplat'}:
+    DEVICE = torch.device('npu')
+elif torch.cuda.is_available():
+    DEVICE = torch.device('cuda')
+else:
+    DEVICE = torch.device('cpu')
 DTYPE = torch.float
 
 XYZ_SCALE = torch.tensor(ALIGN_RATIO * VOXEL_SIZE, device=DEVICE, dtype=DTYPE) # Control how far a Gaussian can move from its anchor point. 
@@ -109,7 +114,10 @@ def main():
 
     # Force the computer to delete old copies immediately to free up memory
     collect()
-    torch_npu.npu.empty_cache() if IS_NPU_BACKEND else torch.cuda.empty_cache()
+    if IS_NPU_BACKEND:
+        torch_npu.npu.empty_cache()
+    elif DEVICE.type == 'cuda':
+        torch.cuda.empty_cache()
 
     # 2. Sampling anchors
 
@@ -134,7 +142,10 @@ def main():
 
     del depth_ma
     collect()
-    torch_npu.npu.empty_cache() if IS_NPU_BACKEND else torch.cuda.empty_cache()
+    if IS_NPU_BACKEND:
+        torch_npu.npu.empty_cache()
+    elif DEVICE.type == 'cuda':
+        torch.cuda.empty_cache()
 
     # 3. Training Gaussians
 
@@ -373,8 +384,11 @@ def main():
         if PROFILE and prof is not None:
             prof.step()
 
-            peak_alloc = torch.cuda.max_memory_allocated() / 1024**2
-            peak_reserved = torch.cuda.max_memory_reserved() / 1024**2
+            if DEVICE.type == 'cuda':
+                peak_alloc = torch.cuda.max_memory_allocated() / 1024**2
+                peak_reserved = torch.cuda.max_memory_reserved() / 1024**2
+            else:
+                peak_alloc = peak_reserved = 0.0
 
             # print(f"Step {i} Peak GPU memory allocated: {peak_alloc:.2f} MB")
             # print(f"Step {i} Peak GPU memory reserved: {peak_reserved:.2f} MB")
