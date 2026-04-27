@@ -11,6 +11,7 @@ from typing_extensions import Literal
 from rasterization_utils import torch_isect_tiles, torch_isect_offset_encode, torch_rasterize_to_pixels_per_tile_per_pixel_per_gauss, torch_rasterize_to_pixels_gaussian_merge, torch_rasterize_to_pixels_pixels_vectorized
 from EWA_fully_fused_proj_packed import *
 from sh_utils import build_color
+from dependency_config import DependencyConfig
 
 
 
@@ -28,6 +29,7 @@ def torch_rasterization(
     Ks: Tensor,  # [..., C, 3, 3]
     width: int,
     height: int,
+    dependency_config: DependencyConfig,
     near_plane: float = 0.01,
     far_plane: float = 1e10,
     radius_clip: float = 0.0,
