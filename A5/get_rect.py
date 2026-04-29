@@ -9,13 +9,12 @@ Contract:
     rect_min  : float32 [N, 2]    clip(pix - r, 0, [W-1, H-1])
     rect_max  : float32 [N, 2]    clip(pix + r, 0, [W-1, H-1])
 
-The clip upper bounds (W-1, H-1) enter `vmins(...)` as Python floats, the same
-way `0.1` enters `vmaxs(0.1)` in get_radius.py. Because the @kernel and @vf
-decorators AST-recompile their function with `exec(..., func.__globals__, ns)`
-and discard closures, the bounds live as module-level globals (_MAX_X, _MAX_Y)
-that the public `get_rect` wrapper rebinds before each OpExec call. Each
-trace reads the live values, so a single compiled @kernel handles any
-(width, height) pair without rebuilding.
+The clip upper bounds (W-1, H-1) flow through the kernel as scalar Var
+arguments. `vmins`/`vmaxs` accept `Union[int, float, Var]` (see
+easyasc/stub_functions/vec/unaryscalar.py:189), and `OpExec.__call__` wraps
+scalar Python floats as `Var` automatically (see torchplugin.py:578-581), so
+the public wrapper just passes `max_x = float(width - 1.0)` /
+`max_y = float(height - 1.0)` after `N` and the kernel reads them as Vars.
 
 Topology: vec-only.
 Tail-safety: arbitrary N. Inner dim 2 is fixed at parse time.
@@ -32,15 +31,10 @@ RECT_COLS = 2    # rect_min / rect_max columns
 PAD = 8          # float32 C0; one C0 block holds 2 real cols + 6 junk
 
 
-# Live clip upper bounds rebound by `get_rect` before each OpExec call.
-# Read at trace time via vmins(_MAX_X) / vmins(_MAX_Y) inside the @vf body.
-_MAX_X = 0.0
-_MAX_Y = 0.0
-
-
 @vf()
 def get_rect_vf(pbuf: Tensor, rbuf: Tensor,
-                mnbuf: Tensor, mxbuf: Tensor, rows: Var):
+                mnbuf: Tensor, mxbuf: Tensor,
+                rows: Var, max_x: Var, max_y: Var):
     px = Reg(DT.float)
     py = Reg(DT.float)
     r = Reg(DT.float)
@@ -51,34 +45,35 @@ def get_rect_vf(pbuf: Tensor, rbuf: Tensor,
         py <<= pbuf[i:i + 1, 1:2].single()
         r <<= rbuf[i:i + 1, 0:1].single()
 
-        # rect_min[..., 0] = clip(px - r, 0, _MAX_X)
+        # rect_min[..., 0] = clip(px - r, 0, max_x)
         out <<= px - r
         out <<= out.vmaxs(0.0)
-        out <<= out.vmins(_MAX_X)
+        out <<= out.vmins(max_x)
         mnbuf[i:i + 1, 0:1] <<= out.single_value()
 
-        # rect_min[..., 1] = clip(py - r, 0, _MAX_Y)
+        # rect_min[..., 1] = clip(py - r, 0, max_y)
         out <<= py - r
         out <<= out.vmaxs(0.0)
-        out <<= out.vmins(_MAX_Y)
+        out <<= out.vmins(max_y)
         mnbuf[i:i + 1, 1:2] <<= out.single_value()
 
-        # rect_max[..., 0] = clip(px + r, 0, _MAX_X)
+        # rect_max[..., 0] = clip(px + r, 0, max_x)
         out <<= px + r
         out <<= out.vmaxs(0.0)
-        out <<= out.vmins(_MAX_X)
+        out <<= out.vmins(max_x)
         mxbuf[i:i + 1, 0:1] <<= out.single_value()
 
-        # rect_max[..., 1] = clip(py + r, 0, _MAX_Y)
+        # rect_max[..., 1] = clip(py + r, 0, max_y)
         out <<= py + r
         out <<= out.vmaxs(0.0)
-        out <<= out.vmins(_MAX_Y)
+        out <<= out.vmins(max_y)
         mxbuf[i:i + 1, 1:2] <<= out.single_value()
 
 
 @kernel()
 def get_rect_kernel(pix_coord: GMTensor, radii: GMTensor,
-                    rect_min: GMTensor, rect_max: GMTensor, N: Var):
+                    rect_min: GMTensor, rect_max: GMTensor,
+                    N: Var, max_x: Var, max_y: Var):
     pbuf = DBuff(DT.float, [CHUNK, PAD], Position.UB)
     rbuf = DBuff(DT.float, [CHUNK, PAD], Position.UB)
     mnbuf = DBuff(DT.float, [CHUNK, PAD], Position.UB)
@@ -102,7 +97,8 @@ def get_rect_kernel(pix_coord: GMTensor, radii: GMTensor,
             rbuf[buf_cnt] <<= radii[row0:row0 + valid_rows, 0:RAD_COLS]
 
             get_rect_vf(pbuf[buf_cnt], rbuf[buf_cnt],
-                        mnbuf[buf_cnt], mxbuf[buf_cnt], valid_rows)
+                        mnbuf[buf_cnt], mxbuf[buf_cnt],
+                        valid_rows, max_x, max_y)
 
             # UB [valid_rows, 8] -> GM [valid_rows, 2] (drop the 6 junk cols).
             rect_min[row0:row0 + valid_rows, 0:RECT_COLS] <<= \
@@ -121,8 +117,10 @@ def get_rect(pix_coord, radii, width, height):
 
     Mirrors 3DGS-opts/pytorch/EWA_fully_fused_proj_packed.py::get_rect. Uses a
     shape-only unsqueeze ([N] -> [N, 1]) on radii to bridge to the kernel
-    layout. Sets module-level _MAX_X / _MAX_Y to (W-1, H-1) so the next
-    @kernel trace reads the right clip bounds inside its @vf calls.
+    layout. The clip upper bounds (W-1, H-1) are passed as scalar Vars after
+    N; `shape_bindings` pins each tensor's row dim to scalar #0 (N) so the
+    auto-shape-inference does not try to match the float bounds against tensor
+    dimensions.
     """
     import torch
 
@@ -133,18 +131,18 @@ def get_rect(pix_coord, radii, width, height):
         "expected radii shape [N] matching pix_coord[0]"
     assert radii.dtype == torch.float32, "expected float32 radii"
 
-    global _MAX_X, _MAX_Y
-    _MAX_X = float(width - 1.0)
-    _MAX_Y = float(height - 1.0)
-
     N = pix_coord.shape[0]
+    max_x = float(width - 1.0)
+    max_y = float(height - 1.0)
+
     pix_2d = pix_coord.contiguous()
     rad_2d = radii.unsqueeze(-1).contiguous()
     rect_min = torch.zeros((N, 2), dtype=torch.float32)
     rect_max = torch.zeros((N, 2), dtype=torch.float32)
 
     out_min, out_max = OpExec(get_rect_kernel, simulator=True)(
-        pix_2d, rad_2d, rect_min, rect_max, N,
+        pix_2d, rad_2d, rect_min, rect_max, N, max_x, max_y,
+        shape_bindings={0: [0, None], 1: [0, None], 2: [0, None], 3: [0, None]},
     )
     return out_min, out_max
 

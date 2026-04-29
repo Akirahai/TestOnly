@@ -23,8 +23,8 @@
 | 3D->2D Projection     | `inverse_cov2d`                 | Backward | `EWA_fully_fused_proj_packed.inverse_cov2d_v2`                         | (autograd)   | - | - | - | - |
 | 3D->2D Projection     | `fully_fused_projection_batch`  | Forward  | `EWA_fully_fused_proj_packed.torch_splat_fully_fused_projection_batch` | ✅           | - | - | - | - |
 | 3D->2D Projection     | `fully_fused_projection_batch`  | Backward | `EWA_fully_fused_proj_packed.torch_splat_fully_fused_projection_batch` | (autograd)   | - | - | - | - |
-| Culling       | `get_radius`                    | Forward  | `EWA_fully_fused_proj_packed.get_radius`                               | ✅ (no_grad) | - | - | - | - |
-| Culling       | `get_rect`                      | Forward  | `EWA_fully_fused_proj_packed.get_rect`                                 | ✅ (no_grad) | - | - | - | - |
+| Culling       | `get_radius`                    | Forward  | `EWA_fully_fused_proj_packed.get_radius`                               | ✅ (no_grad) | - | - | ✅ | - |
+| Culling       | `get_rect`                      | Forward  | `EWA_fully_fused_proj_packed.get_rect`                                 | ✅ (no_grad) | - | - | ✅ | - |
 | Gaussian Sorting             | `isect_tiles`                   | Forward  | `rasterization_utils.torch_isect_tiles`                                | ✅ (no_grad) | - | - | - | - |
 | Gaussian Sorting             | `isect_offset_encode`           | Forward  | `rasterization_utils.torch_isect_offset_encode`                        | ✅ (no_grad) | - | - | - | - |
 | Image rendering            | `rasterize_to_pixels`           | Forward  | `rasterization_utils.torch_rasterize_to_pixels_gaussian_merge`         | ✅           | - | - | - | - |
