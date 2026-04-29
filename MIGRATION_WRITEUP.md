@@ -17,7 +17,7 @@
 | 3D->2D Projection     | `build_covariance_3d`           | Backward | `EWA_fully_fused_proj_packed.build_covariance_3d`                      | (autograd)   | - | - | - | - |
 | 3D->2D Projection     | `projection_means2d_pinhole`    | Forward  | `EWA_fully_fused_proj_packed.projection_means2d_pinhole`               | ✅           | - | - | - | - |
 | 3D->2D Projection     | `projection_means2d_pinhole`    | Backward | `EWA_fully_fused_proj_packed.projection_means2d_pinhole`               | (autograd)   | - | - | - | - |
-| 3D->2D Projection     | `build_covariance_2d`           | Forward  | `EWA_fully_fused_proj_packed.build_covariance_2d`                      | ✅           | - | - | - | - |
+| 3D->2D Projection     | `build_covariance_2d`           | Forward  | `EWA_fully_fused_proj_packed.build_covariance_2d`                      | ✅           | - | - | ✅ | - |
 | 3D->2D Projection     | `build_covariance_2d`           | Backward | `EWA_fully_fused_proj_packed.build_covariance_2d`                      | (autograd)   | - | - | - | - |
 | 3D->2D Projection     | `inverse_cov2d`                 | Forward  | `EWA_fully_fused_proj_packed.inverse_cov2d_v2`                         | ✅           | - | - | ✅ | - |
 | 3D->2D Projection     | `inverse_cov2d`                 | Backward | `EWA_fully_fused_proj_packed.inverse_cov2d_v2`                         | (autograd)   | - | - | - | - |
